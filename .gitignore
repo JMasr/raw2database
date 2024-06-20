@@ -2,8 +2,12 @@
 __pycache__/
 *.pyc
 
-# Environment variables
-config/
+# Pycharm
+.idea/
 
-# Data files
-raw_data/
+# Data & Config
+config/
+data/
+
+# Logs
+logs/
