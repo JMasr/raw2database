@@ -9,7 +9,7 @@ import pandas as pd
 from pydantic import BaseModel
 from sqlalchemy import create_engine
 
-from logger import BasicLogger
+from src.logger import BasicLogger
 
 
 class BaseDatabaseHandler(ABC, BaseModel):

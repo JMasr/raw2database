@@ -2,7 +2,7 @@ import argparse
 import os
 from pathlib import Path
 
-from database.database_handler import DatabaseHandlerFactory
+from src.database.database_handler import DatabaseHandlerFactory
 
 ROOT_PATH = Path(__file__).parent
 
