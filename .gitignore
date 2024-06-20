@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.pyc
+
+# Environment variables
+config/
+
+# Data files
+raw_data/

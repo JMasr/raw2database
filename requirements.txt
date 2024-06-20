@@ -1,0 +1,8 @@
+sqlalchemy~=2.0.30
+python-dotenv~=1.0.1
+pydantic~=2.7.4
+numpy~=1.24.3
+pandas~=2.0.3
+pytest~=7.4.4
+faker~=24.14.1
+psycopg2-binary~=2.9.9
