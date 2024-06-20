@@ -101,11 +101,15 @@ EOL
 ```bash
 docker-compose up -d
 ```
+8. Create a configuration folder
+```bash
+mkdir config
+```
 
-8. Configure the Database
+9. Configure the Database
 Edit the config/postgres_config.json file to set the database connection details:
 ```bash
-cd ../config
+cd config
 cat <<EOL > postgres_config.json
 {
   "db_type": "postgres",
@@ -117,7 +121,7 @@ cat <<EOL > postgres_config.json
 }
 EOL
 ```
-9. Running the Application
+10. Running the Application
 To load data from a CSV file into the database, run:
 ```bash
 python src/main.py --raw_files_path <path/to/your_data.csv> --config_file config/postgres_config.json --db_type postgres
