@@ -13,12 +13,10 @@ from src.logger import BasicLogger
 
 
 class BaseDatabaseHandler(ABC, BaseModel):
-    db_type: str
-    path2config: str
+    db_configuration: Dict[str, Any]
 
     engine: Optional[Any] = None
     app_logger: Optional[logging.Logger] = None
-    configuration_data: Optional[Dict[str, Any]] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -44,21 +42,9 @@ class BaseDatabaseHandler(ABC, BaseModel):
             except Exception as e:
                 raise ValueError("DatabaseHandler - Error on the Logger provided.") from e
 
-    def _read_config_from_file(self) -> Dict[str, Any]:
-        # Read the configuration file based on the extension
-        if not os.path.isfile(self.path2config):
-            raise FileNotFoundError(f"DatabaseHandler - Configuration file not found: {self.path2config}")
-
-        if self.path2config.endswith(".json"):
-            with open(self.path2config, "r") as file:
-                configuration_as_dict = json.load(file)
-        else:
-            raise ValueError(f"DatabaseHandler - Unsupported file extension: {self.path2config}")
-        return configuration_as_dict
-
+    @abstractmethod
     def setup(self):
-        self._logger_setup()
-        self.configuration_data = self._read_config_from_file()
+        pass
 
     @abstractmethod
     def connect(self):
@@ -78,46 +64,54 @@ class BaseDatabaseHandler(ABC, BaseModel):
         return self.engine
 
 
-class PostgresHandler(BaseDatabaseHandler):
+class PostgresHandler(BaseDatabaseHandler, ABC):
 
-    def _try_to_connect_n_times(self, db_host, db_name, db_password, db_port, db_user, max_retries):
+    def setup(self, max_retries: int = 3):
+        # Load configuration data
+        db_user = self.db_configuration.get('DB_USER')
+        db_password = self.db_configuration.get('DB_PASSWORD')
+        db_host = self.db_configuration.get('DB_HOST')
+        db_port = self.db_configuration.get('DB_PORT')
+        db_name = self.db_configuration.get('DB_NAME')
+
+        if not all([db_user, db_password, db_host, db_port, db_name]):
+            raise ValueError(f"PostgresHandler - Missing or invalid configuration data: {self.db_configuration}")
+
+        try:
+            engine = create_engine(
+                f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}')
+            self.engine = engine
+
+            self.app_logger.info("PostgresHandler - Connected to Postgres.")
+        except Exception as e:
+            self.app_logger.error(f"PostgresHandler - Error during Postgres Engine Setup: {e}")
+            raise SystemError(e)
+
+    def connect(self, max_retries: int = 3) -> bool:
+        if self.engine is not None:
+            self.app_logger.warning("PostgresHandler - Engine dont setting up, trying to do it...")
+            self.setup()
+
         engine, retries = None, 0
+        response: bool = False
         while retries < max_retries:
             try:
-                engine = create_engine(
-                    f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}')
-                self.app_logger.info("PostgresHandler - Connected to Postgres.")
+                self.engine.connect()
+                response = True
+
+                self.app_logger.info("PostgresHandler - Connection Establishing ")
                 break
             except Exception as e:
                 self.app_logger.error(f"PostgresHandler - Error connecting to Postgres: {e}. Retrying...")
                 retries += 1
+
         if retries == max_retries:
-            raise ConnectionError(f"PostgresHandler - Failed to connect after multiple retries.")
+            self.app_logger.error(f"PostgresHandler - Failed to connect after {max_retries} retries.")
 
-        return engine
+        return response
 
-    def connect(self, max_retries: int = 3):
-        # Load configuration data
-        db_user = self.configuration_data.get('DB_USER')
-        db_password = self.configuration_data.get('DB_PASSWORD')
-        db_host = self.configuration_data.get('DB_HOST')
-        db_port = self.configuration_data.get('DB_PORT')
-        db_name = self.configuration_data.get('DB_NAME')
-
-        # Input validation and sanitization
-        if not all([db_user, db_password, db_host, db_port, db_name]):
-            raise ValueError(f"PostgresHandler - Missing or invalid configuration data: {self.configuration_data}")
-
-        self.engine = self._try_to_connect_n_times(db_host, db_name, db_password, db_port, db_user, max_retries)
-
-    def is_the_connection_up(self) -> bool:
-        try:
-            self.engine.connect()
-            self.app_logger.info("Postgres is running")
-            return True
-        except Exception as e:
-            self.app_logger.error(f"PostgresHandler - Error connecting to Postgres: {e}. Try call `connect` first ")
-            return False
+    def is_the_connection_up(self):
+        return self.connect(max_retries=1)
 
     def close_connection(self):
         try:
@@ -182,13 +176,9 @@ class PostgresHandler(BaseDatabaseHandler):
 
 class DatabaseHandlerFactory:
     @staticmethod
-    def get_database_handler(db_type: str, path_to_config: str,
-                             app_logger: logging.Logger = None) -> BaseDatabaseHandler:
+    def get_database_handler(db_config: Dict[str, Any], app_logger: logging.Logger = None) -> BaseDatabaseHandler:
+        db_type = db_config.get("DB_TYPE")
         if db_type == "postgres":
-            return PostgresHandler(
-                db_type=db_type,
-                path2config=path_to_config,
-                app_logger=app_logger,
-            )
+            return PostgresHandler(db_configuration=db_config, app_logger=app_logger)
         else:
             raise ValueError(f"Unsupported database type: {db_type}")
