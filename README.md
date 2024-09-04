@@ -46,7 +46,7 @@ raw2database/
 │   ├── test_data_loader.py
 │   └── test_data_processor.py
 ├── config/
-│   └── db_type_config.json
+│   └── your_db_config.json
 ├── raw_data/
 │   └── your_data.csv
 ├── requirements.txt
@@ -72,7 +72,7 @@ cd raw2database
 3. Create and Activate the Conda Environment
 
 ```bash
-conda env create -n raw2database
+conda create -n raw2database python=3.9
 conda activate raw2database
 ```
 
