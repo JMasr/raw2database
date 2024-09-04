@@ -2,6 +2,7 @@ import argparse
 import os
 from pathlib import Path
 
+from src.utils import read_config_from_file
 from src.database.database_handler import DatabaseHandlerFactory
 
 ROOT_PATH = Path(__file__).parent
@@ -15,12 +16,6 @@ if __name__ == '__main__':
         help="Path to the configuration file",
     )
     arguments.add_argument(
-        "--db_type",
-        type=str,
-        default="postgres",
-        help="Type of database to connect to",
-    )
-    arguments.add_argument(
         "--raw_files_path",
         type=str,
         default=os.path.join(ROOT_PATH, "data"),
@@ -28,13 +23,17 @@ if __name__ == '__main__':
     )
     args = arguments.parse_args()
 
-    db_type = args.db_type
+
     path_config_file = args.config_file
     raw_files_path = args.raw_files_path
 
-    db_handler = DatabaseHandlerFactory.get_database_handler(db_type, path_config_file)
+    db_configuration = read_config_from_file(path_config_file)
+    db_configuration["RAW_FOLDER_PATH"] = raw_files_path
+
+    db_handler = DatabaseHandlerFactory.get_database_handler(db_config=db_configuration)
     db_handler.setup()
     db_handler.connect()
-    db_handler.is_the_connection_up()
-    db_handler.files2tables(raw_files_path)
-    db_handler.close_connection()
+    if db_handler.is_the_connection_up():
+        db_handler.files2tables(raw_files_path)
+        db_handler.close_connection()
+
