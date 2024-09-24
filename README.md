@@ -47,8 +47,11 @@ raw2database/
 │   └── test_data_processor.py
 ├── config/
 │   └── your_db_config.json
-├── raw_data/
-│   └── your_data.csv
+├── data/
+│   └── raw/
+│   └── processed
+│   └── interim
+│   └── external
 ├── requirements.txt
 ├── README.md
 └── .gitignore
