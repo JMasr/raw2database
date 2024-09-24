@@ -10,7 +10,7 @@ from faker import Faker
 from pydantic import ValidationError
 
 from logger import BasicLogger
-from src.database.database_handler import PostgresHandler, BaseDatabaseHandler, DatabaseHandlerFactory
+from src.database.handler import PostgresHandler, BaseDatabaseHandler, DatabaseHandlerFactory
 from test import TEST_FOLDER
 
 

@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 from abc import ABC, abstractmethod
@@ -115,14 +114,13 @@ class PostgresHandler(BaseDatabaseHandler, ABC):
 
     def close_connection(self):
         try:
-            if self.is_the_connection_up():
-                self.engine.dispose()
-                self.app_logger.info("PostgresHandler - Postgres connection closed.")
-            else:
-                self.app_logger.warning("PostgresHandler - Postgres connection already closed.")
+            self.engine.dispose()
+            self.app_logger.info("PostgresHandler - Postgres connection closed.")
+
         except Exception as e:
             self.app_logger.error(f"PostgresHandler - Error closing the connection: {e}")
             raise ConnectionError("PostgresHandler - Error closing the connection.") from e
+
 
     def _files2dataframes(self, raw_files_path: str, raw_files_extension: str) -> Dict[str, pd.DataFrame]:
         try:
@@ -130,7 +128,6 @@ class PostgresHandler(BaseDatabaseHandler, ABC):
             self.app_logger.info(f"DataProcessor "
                                  f"- Found {len(raw_file_names)} files with extension {raw_files_extension}")
 
-            # Storage each file ina pandas dataframe
             files2dataframes = {}
             for file_name in raw_file_names:
                 self.app_logger.info(f"DataProcessor - Reading file {file_name}")
@@ -161,14 +158,57 @@ class PostgresHandler(BaseDatabaseHandler, ABC):
 
         return files2dataframes
 
+    @staticmethod
+    def _preprocess_dataframes(dict_with_df: dict):
+        """
+        Recive a dictionary with dataframes and preprocess them to cast the columns to the correct data types, assign
+        the correct column names, remove duplicates, and handle missing values.
+
+        :param dict_with_df: Dictionary with dataframes
+        :return: A dictionary with preprocessed dataframes
+        """
+        clean_dataframes = {}
+        for key, df in dict_with_df.items():
+            df = df.copy()
+
+            # Infer the data types of the columns
+            df = df.infer_objects()
+
+            # Cast categorical columns with a low cardinality to category type
+            for col in df.select_dtypes(include=["object"]).columns:
+                if df[col].nunique() < 10:
+                    df[col] = df[col].astype("category")
+
+            # Remove duplicates
+            df = df.drop_duplicates()
+
+            # Handle missing values on numerical columns, filling with 0
+            numerical_columns = df.select_dtypes(include=["float64", "int64"]).columns
+            df[numerical_columns] = df[numerical_columns].fillna(0)
+
+            # Handle missing values on categorical columns, filling with "No Answer"
+            categorical_columns = df.select_dtypes(include=["object"]).columns
+            df[categorical_columns] = df[categorical_columns].fillna("No Answer")
+
+            # Assign to categorical columns a string type
+            df[categorical_columns] = df[categorical_columns].astype(str)
+
+            clean_dataframes[key] = df
+
+        return clean_dataframes
+
+
+
     def files2tables(self, raw_files_path: str, raw_files_extension: str = ".csv"):
         files_as_dataframes = self._files2dataframes(raw_files_path, raw_files_extension)
-        if len(files_as_dataframes) == 0:
+        clean_dataframes = self._preprocess_dataframes(files_as_dataframes)
+
+        if len(clean_dataframes) == 0:
             raise ValueError("DataProcessor - No dataframes found. We will not create any table.")
 
         file: str
         df: pd.DataFrame
-        for file, df in files_as_dataframes.items():
+        for file, df in clean_dataframes.items():
             self.app_logger.info(f"DataProcessor - Saving dataframe {file} as a table")
             num_row_transformed = df.copy().to_sql(file, con=self.engine, if_exists="replace")
             self.app_logger.info(f"DataProcessor - {num_row_transformed} rows were saved in the table {file}")
